@@ -82,4 +82,12 @@ export class StorageService {
     this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: updated });
     this.persist();
   }
+
+  updateItem(email: string, updatedItem: Item): void {
+    const key = email.trim().toLowerCase();
+    const current = this.itemsByEmail()[key] ?? [];
+    const updated = current.map((i) => (i.id === updatedItem.id ? { ...i, ...updatedItem } : i));
+    this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: updated });
+    this.persist();
+  }
 }

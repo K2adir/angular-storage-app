@@ -12,6 +12,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { Item } from '../../models/item';
+import { ItemEditDialogComponent } from './item-edit-dialog.component';
 
 @Component({
   selector: 'app-customer-detail',
@@ -29,6 +32,7 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
     MatSelectModule,
     MatDatepickerModule,
     MatNativeDateModule,
+    MatDialogModule,
   ],
   template: `
     <a mat-button color="primary" routerLink="/customers">← Back to customers</a>
@@ -105,7 +109,10 @@ import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>Actions</th>
             <td mat-cell *matCellDef="let i">
-              <button mat-icon-button color="warn" (click)="remove(i.id)">
+              <button mat-icon-button (click)="edit(i)" aria-label="Edit item">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="remove(i.id)" aria-label="Delete item">
                 <mat-icon>delete</mat-icon>
               </button>
             </td>
@@ -135,6 +142,7 @@ export class CustomerDetailComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
   private readonly store = inject(StorageService);
+  private readonly dialog = inject(MatDialog);
 
   readonly email = computed(() => String(this.route.snapshot.paramMap.get('email') ?? '').toLowerCase());
   readonly customer = computed(() => this.store.getCustomer(this.email() ?? ''));
@@ -166,5 +174,16 @@ export class CustomerDetailComponent {
   remove(id: string) {
     this.store.removeItem(this.email(), id);
   }
-}
 
+  edit(item: Item) {
+    const ref = this.dialog.open(ItemEditDialogComponent, {
+      data: { item },
+      width: '520px',
+    });
+    ref.afterClosed().subscribe((updated?: Item) => {
+      if (updated) {
+        this.store.updateItem(this.email(), updated);
+      }
+    });
+  }
+}
