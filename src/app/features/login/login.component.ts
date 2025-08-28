@@ -19,11 +19,14 @@ import { AuthService } from '../../core/auth.service';
         <form [formGroup]="form" (ngSubmit)="onSubmit()">
           <mat-form-field appearance="outline" class="full">
             <mat-label>Email</mat-label>
-            <input matInput formControlName="email" type="email" required />
+            <input matInput formControlName="email" type="email" required autocomplete="username" />
+            <mat-error *ngIf="form.controls.email.hasError('required') && form.controls.email.touched">Email is required</mat-error>
+            <mat-error *ngIf="form.controls.email.hasError('email') && form.controls.email.touched">Enter a valid email</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" class="full">
             <mat-label>Password</mat-label>
-            <input matInput formControlName="password" type="password" required />
+            <input matInput formControlName="password" type="password" required autocomplete="current-password" />
+            <mat-error *ngIf="form.controls.password.hasError('required') && form.controls.password.touched">Password is required</mat-error>
           </mat-form-field>
           <button mat-flat-button color="primary" class="full" [disabled]="form.invalid">Login</button>
           <div class="hint">Use admin@storage.local / admin</div>
@@ -62,4 +65,3 @@ export class LoginComponent {
     }
   }
 }
-

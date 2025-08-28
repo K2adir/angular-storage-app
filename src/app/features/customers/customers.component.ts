@@ -22,10 +22,13 @@ import { StorageService } from '../../core/storage.service';
             <mat-form-field appearance="outline" class="full">
               <mat-label>Name</mat-label>
               <input matInput formControlName="name" required />
+              <mat-error *ngIf="form.controls.name.hasError('required') && form.controls.name.touched">Name is required</mat-error>
             </mat-form-field>
             <mat-form-field appearance="outline" class="full">
               <mat-label>Email</mat-label>
-              <input matInput formControlName="email" type="email" required />
+              <input matInput formControlName="email" type="email" required autocomplete="off" />
+              <mat-error *ngIf="form.controls.email.hasError('required') && form.controls.email.touched">Email is required</mat-error>
+              <mat-error *ngIf="form.controls.email.hasError('email') && form.controls.email.touched">Enter a valid email</mat-error>
             </mat-form-field>
           </div>
           <button mat-flat-button color="primary" [disabled]="form.invalid">Add</button>
@@ -96,4 +99,3 @@ export class CustomersComponent {
     this.form.reset();
   }
 }
-
