@@ -2,11 +2,12 @@ import { Injectable, signal, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Customer } from '../models/customer';
 import { Item } from '../models/item';
+import { ArchivedItemRecord } from '../models/archived';
 
 interface StorageData {
   customers: Customer[];
   itemsByEmail: Record<string, Item[]>;
-  archivedByEmail: Record<string, Item[]>;
+  archivedByEmail: Record<string, ArchivedItemRecord[] | Item[]>; // tolerate legacy arrays of Item
 }
 
 const STORAGE_KEY = 'storageApp.data.v1';
@@ -15,7 +16,7 @@ const STORAGE_KEY = 'storageApp.data.v1';
 export class StorageService {
   readonly customers = signal<Customer[]>([]);
   readonly itemsByEmail = signal<Record<string, Item[]>>({});
-  readonly archivedByEmail = signal<Record<string, Item[]>>({});
+  readonly archivedByEmail = signal<Record<string, ArchivedItemRecord[]>>({});
   private readonly platformId = inject(PLATFORM_ID);
 
   constructor() {
@@ -30,7 +31,16 @@ export class StorageService {
       const parsed: StorageData = JSON.parse(raw);
       this.customers.set(parsed.customers ?? []);
       this.itemsByEmail.set(parsed.itemsByEmail ?? {});
-      this.archivedByEmail.set(parsed.archivedByEmail ?? {});
+      // Migrate legacy archived value shape (Item[] -> ArchivedItemRecord[])
+      const rawArchived = parsed.archivedByEmail ?? {};
+      const migrated: Record<string, ArchivedItemRecord[]> = {};
+      Object.keys(rawArchived).forEach((email) => {
+        const arr = (rawArchived as any)[email] as any[];
+        migrated[email] = (arr ?? []).map((x: any) =>
+          x && x.item ? x as ArchivedItemRecord : ({ item: x as Item, reason: 'Archived', archivedAt: new Date().toISOString() })
+        );
+      });
+      this.archivedByEmail.set(migrated);
     } catch {
       // ignore
     }
@@ -79,7 +89,11 @@ export class StorageService {
   }
 
   removeItem(email: string, itemId: string): void {
-    // Now archives instead of deleting permanently
+    // Backward-compat: archive with generic reason
+    this.archiveItem(email, itemId, { reason: 'Archived' });
+  }
+
+  archiveItem(email: string, itemId: string, meta: { reason: string; notes?: string }): void {
     const key = email.trim().toLowerCase();
     const current = this.itemsByEmail()[key] ?? [];
     const idx = current.findIndex((i) => i.id === itemId);
@@ -87,7 +101,13 @@ export class StorageService {
     const [removed] = current.splice(idx, 1);
     const updatedActive = [...current];
     const archived = this.archivedByEmail()[key] ?? [];
-    const updatedArchived = [...archived, removed];
+    const record: ArchivedItemRecord = {
+      item: removed,
+      reason: meta.reason,
+      notes: meta.notes,
+      archivedAt: new Date().toISOString(),
+    };
+    const updatedArchived = [...archived, record];
     this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: updatedActive });
     this.archivedByEmail.set({ ...this.archivedByEmail(), [key]: updatedArchived });
     this.persist();
@@ -101,7 +121,7 @@ export class StorageService {
     this.persist();
   }
 
-  archivedItemsFor(email: string): Item[] {
+  archivedItemsFor(email: string): ArchivedItemRecord[] {
     const key = email.trim().toLowerCase();
     return this.archivedByEmail()[key] ?? [];
   }
@@ -109,11 +129,11 @@ export class StorageService {
   restoreItem(email: string, itemId: string): void {
     const key = email.trim().toLowerCase();
     const archived = this.archivedByEmail()[key] ?? [];
-    const idx = archived.findIndex((i) => i.id === itemId);
+    const idx = archived.findIndex((r) => r.item.id === itemId);
     if (idx === -1) return;
-    const [restored] = archived.splice(idx, 1);
+    const [record] = archived.splice(idx, 1);
     const active = this.itemsByEmail()[key] ?? [];
-    this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: [...active, restored] });
+    this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: [...active, record.item] });
     this.archivedByEmail.set({ ...this.archivedByEmail(), [key]: [...archived] });
     this.persist();
   }
@@ -121,7 +141,7 @@ export class StorageService {
   purgeArchived(email: string, itemId: string): void {
     const key = email.trim().toLowerCase();
     const archived = this.archivedByEmail()[key] ?? [];
-    const updated = archived.filter((i) => i.id !== itemId);
+    const updated = archived.filter((r) => r.item.id !== itemId);
     this.archivedByEmail.set({ ...this.archivedByEmail(), [key]: updated });
     this.persist();
   }

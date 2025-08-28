@@ -20,6 +20,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
+import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.component';
 
 @Component({
   selector: 'app-customer-detail',
@@ -58,7 +59,8 @@ import { MatDividerModule } from '@angular/material/divider';
         <button mat-stroked-button color="primary">Save Rate</button>
         <mat-divider class="spacer-divider"></mat-divider>
         <mat-chip-set>
-          <mat-chip color="primary" selected>Total Volume: {{ totalVolumeM3() | number:'1.3-3' }} m³</mat-chip>
+          <mat-chip color="primary" selected>Auto Items: {{ itemsAuto().length }}</mat-chip>
+          <mat-chip color="primary" selected>Billed m³: {{ billedUnitsAuto() }}</mat-chip>
           <mat-chip color="accent" selected>Total Monthly: {{ totalMonthlyCost() | currency:'USD':'symbol' }}</mat-chip>
         </mat-chip-set>
       </form>
@@ -139,52 +141,62 @@ import { MatDividerModule } from '@angular/material/divider';
         <mat-tab-group>
           <mat-tab label="Items">
             <table mat-table [dataSource]="items()" class="mat-elevation-z1">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Name</th>
-                <td mat-cell *matCellDef="let i">{{ i.name }}</td>
-              </ng-container>
-              <ng-container matColumnDef="barcode">
-                <th mat-header-cell *matHeaderCellDef>Barcode</th>
-                <td mat-cell *matCellDef="let i">{{ i.barcode || '-' }}</td>
-              </ng-container>
-              <ng-container matColumnDef="quantity">
-                <th mat-header-cell *matHeaderCellDef>Qty</th>
-                <td mat-cell *matCellDef="let i">{{ i.quantity }}</td>
-              </ng-container>
-              <ng-container matColumnDef="dimensions">
-                <th mat-header-cell *matHeaderCellDef>Dimensions (cm)</th>
-                <td mat-cell *matCellDef="let i">{{ i.widthCm }}×{{ i.lengthCm }}×{{ i.heightCm }}</td>
-              </ng-container>
-              <ng-container matColumnDef="location">
-                <th mat-header-cell *matHeaderCellDef>Location</th>
-                <td mat-cell *matCellDef="let i">{{ i.location }}</td>
-              </ng-container>
-              <ng-container matColumnDef="dateAdded">
-                <th mat-header-cell *matHeaderCellDef>Date Added</th>
-                <td mat-cell *matCellDef="let i">{{ i.dateAdded | date: 'mediumDate' }}</td>
-              </ng-container>
-              <ng-container matColumnDef="volume">
-                <th mat-header-cell *matHeaderCellDef>Volume (m³)</th>
-                <td mat-cell *matCellDef="let i">{{ volumeM3(i) | number:'1.3-3' }}</td>
-              </ng-container>
-              <ng-container matColumnDef="monthlyCost">
-                <th mat-header-cell *matHeaderCellDef>Monthly Cost</th>
-                <td mat-cell *matCellDef="let i">{{ itemMonthlyCost(i) | currency:'USD' }}</td>
-              </ng-container>
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>Actions</th>
-                <td mat-cell *matCellDef="let i">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let i">{{ i.name }}</td>
+            <td mat-footer-cell *matFooterCellDef>Total</td>
+          </ng-container>
+          <ng-container matColumnDef="barcode">
+            <th mat-header-cell *matHeaderCellDef>Barcode</th>
+            <td mat-cell *matCellDef="let i">{{ i.barcode || '-' }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="quantity">
+            <th mat-header-cell *matHeaderCellDef>Qty</th>
+            <td mat-cell *matCellDef="let i">{{ i.quantity }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="dimensions">
+            <th mat-header-cell *matHeaderCellDef>Dimensions (cm)</th>
+            <td mat-cell *matCellDef="let i">{{ i.widthCm }}×{{ i.lengthCm }}×{{ i.heightCm }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="location">
+            <th mat-header-cell *matHeaderCellDef>Location</th>
+            <td mat-cell *matCellDef="let i">{{ i.location }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="dateAdded">
+            <th mat-header-cell *matHeaderCellDef>Date Added</th>
+            <td mat-cell *matCellDef="let i">{{ i.dateAdded | date: 'mediumDate' }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="volume">
+            <th mat-header-cell *matHeaderCellDef>Volume (m³)</th>
+            <td mat-cell *matCellDef="let i">{{ volumeM3(i) | number:'1.3-3' }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="monthlyCost">
+            <th mat-header-cell *matHeaderCellDef>Monthly Cost</th>
+            <td mat-cell *matCellDef="let i">{{ itemMonthlyCost(i) | currency:'USD' }}</td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalMonthlyCost() | currency:'USD' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let i">
                   <button mat-icon-button (click)="edit(i)" aria-label="Edit item">
                     <mat-icon>edit</mat-icon>
                   </button>
-                  <button mat-icon-button color="warn" (click)="remove(i.id)" aria-label="Delete item">
+                  <button mat-icon-button color="warn" (click)="archive(i)" aria-label="Archive item">
                     <mat-icon>delete</mat-icon>
                   </button>
-                </td>
-              </ng-container>
+            </td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="columns"></tr>
               <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+              <tr mat-footer-row *matFooterRowDef="columns"></tr>
             </table>
             <div *ngIf="items().length === 0" class="empty">No items yet.</div>
           </mat-tab>
@@ -192,20 +204,28 @@ import { MatDividerModule } from '@angular/material/divider';
             <table mat-table [dataSource]="archivedItems()" class="mat-elevation-z1">
               <ng-container matColumnDef="name">
                 <th mat-header-cell *matHeaderCellDef>Name</th>
-                <td mat-cell *matCellDef="let i">{{ i.name }}</td>
+                <td mat-cell *matCellDef="let r">{{ r.item.name }}</td>
               </ng-container>
               <ng-container matColumnDef="barcode">
                 <th mat-header-cell *matHeaderCellDef>Barcode</th>
-                <td mat-cell *matCellDef="let i">{{ i.barcode || '-' }}</td>
+                <td mat-cell *matCellDef="let r">{{ r.item.barcode || '-' }}</td>
               </ng-container>
               <ng-container matColumnDef="dimensions">
                 <th mat-header-cell *matHeaderCellDef>Dimensions (cm)</th>
-                <td mat-cell *matCellDef="let i">{{ i.widthCm }}×{{ i.lengthCm }}×{{ i.heightCm }}</td>
+                <td mat-cell *matCellDef="let r">{{ r.item.widthCm }}×{{ r.item.lengthCm }}×{{ r.item.heightCm }}</td>
+              </ng-container>
+              <ng-container matColumnDef="reason">
+                <th mat-header-cell *matHeaderCellDef>Reason</th>
+                <td mat-cell *matCellDef="let r">{{ r.reason }}</td>
+              </ng-container>
+              <ng-container matColumnDef="notes">
+                <th mat-header-cell *matHeaderCellDef>Notes</th>
+                <td mat-cell *matCellDef="let r">{{ r.notes || '-' }}</td>
               </ng-container>
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Actions</th>
-                <td mat-cell *matCellDef="let i">
-                  <button mat-button color="primary" (click)="restore(i.id)">Restore</button>
+                <td mat-cell *matCellDef="let r">
+                  <button mat-button color="primary" (click)="restore(r.item.id)">Restore</button>
                 </td>
               </ng-container>
               <tr mat-header-row *matHeaderRowDef="archivedColumns"></tr>
@@ -248,7 +268,7 @@ export class CustomerDetailComponent {
   readonly ratePerM3 = computed(() => this.customer()?.ratePerM3 ?? 10);
 
   columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'monthlyCost', 'actions'];
-  archivedColumns = ['name', 'barcode', 'dimensions', 'actions'];
+  archivedColumns = ['name', 'barcode', 'dimensions', 'reason', 'notes', 'actions'];
 
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
@@ -277,16 +297,30 @@ export class CustomerDetailComponent {
     if (i.pricingMode === 'manual' && typeof i.manualMonthlyCost === 'number') {
       return i.manualMonthlyCost;
     }
-    return this.volumeM3(i) * this.ratePerM3();
+    return this.itemBilledUnits(i) * this.ratePerM3();
   }
 
-  totalVolumeM3 = computed(() => this.items().reduce((sum, it) => sum + this.volumeM3(it), 0));
-  totalMonthlyCost = computed(() => this.items().reduce((sum, it) => sum + this.itemMonthlyCost(it), 0));
+  // Auto-priced items aggregation (per-item minimum 1 m³, ceil per item)
+  itemsAuto = computed(() => this.items().filter(i => i.pricingMode !== 'manual'));
+  autoVolumeM3 = computed(() => this.itemsAuto().reduce((sum, it) => sum + this.volumeM3(it), 0));
+  itemBilledUnits(i: Item): number {
+    const units = Math.ceil(this.volumeM3(i));
+    return Math.max(1, units);
+  }
+  billedUnitsAuto = computed(() => this.itemsAuto().reduce((sum, it) => sum + this.itemBilledUnits(it), 0));
+  totalAutoCost = computed(() => this.billedUnitsAuto() * this.ratePerM3());
+
+  // Manual-priced items sum
+  totalManualCost = computed(() => this.items().filter(i => i.pricingMode === 'manual').reduce((sum, it) => sum + (Number(it.manualMonthlyCost) || 0), 0));
+
+  totalMonthlyCost = computed(() => this.totalAutoCost() + this.totalManualCost());
 
   estimatedNewItemCost() {
     const raw = this.form.getRawValue();
-    const volume = ((Number(raw.widthCm) || 0) * (Number(raw.lengthCm) || 0) * (Number(raw.heightCm) || 0) * (Number(raw.quantity) || 0)) / 1_000_000;
-    return volume * this.ratePerM3();
+    if (!raw.autoPricing) return Number(raw.manualMonthlyCost || 0);
+    const addedVol = ((Number(raw.widthCm) || 0) * (Number(raw.lengthCm) || 0) * (Number(raw.heightCm) || 0) * (Number(raw.quantity) || 0)) / 1_000_000;
+    const units = Math.max(1, Math.ceil(addedVol));
+    return units * this.ratePerM3();
   }
 
   onAddItem() {
@@ -308,9 +342,14 @@ export class CustomerDetailComponent {
     this.snack.open('Item added', 'OK', { duration: 2000 });
   }
 
-  remove(id: string) {
-    this.store.removeItem(this.email(), id);
-    this.snack.open('Item deleted', 'OK', { duration: 2000 });
+  archive(item: Item) {
+    const ref = this.dialog.open(ArchiveDialogComponent, { data: { name: item.name } });
+    ref.afterClosed().subscribe((res?: ArchiveDialogResult) => {
+      if (res) {
+        this.store.archiveItem(this.email(), item.id, { reason: res.reason, notes: res.notes });
+        this.snack.open('Item archived', 'OK', { duration: 2000 });
+      }
+    });
   }
 
   edit(item: Item) {

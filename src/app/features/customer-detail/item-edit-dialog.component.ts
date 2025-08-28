@@ -155,6 +155,7 @@ export class ItemEditDialogComponent {
   }
 
   computedCost(): number {
-    return this.volumeM3() * this.data.ratePerM3;
+    const units = Math.max(1, Math.ceil(this.volumeM3()));
+    return units * this.data.ratePerM3;
   }
 }
