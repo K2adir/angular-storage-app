@@ -18,6 +18,8 @@ import { ItemEditDialogComponent } from './item-edit-dialog.component';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatDividerModule } from '@angular/material/divider';
 
 @Component({
   selector: 'app-customer-detail',
@@ -39,6 +41,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
     MatSnackBarModule,
     MatTabsModule,
     MatSlideToggleModule,
+    MatChipsModule,
+    MatDividerModule,
   ],
   template: `
     <a mat-button color="primary" routerLink="/customers">← Back to customers</a>
@@ -52,10 +56,11 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
           <input matInput type="number" min="0" step="0.01" formControlName="ratePerM3" />
         </mat-form-field>
         <button mat-stroked-button color="primary">Save Rate</button>
-        <div class="totals">
-          <div>Total Volume: {{ totalVolumeM3() | number:'1.3-3' }} m³</div>
-          <div>Total Monthly Cost: {{ totalMonthlyCost() | currency:'USD':'symbol' }}</div>
-        </div>
+        <mat-divider class="spacer-divider"></mat-divider>
+        <mat-chip-set>
+          <mat-chip color="primary" selected>Total Volume: {{ totalVolumeM3() | number:'1.3-3' }} m³</mat-chip>
+          <mat-chip color="accent" selected>Total Monthly: {{ totalMonthlyCost() | currency:'USD':'symbol' }}</mat-chip>
+        </mat-chip-set>
       </form>
     </mat-card>
 
@@ -221,11 +226,12 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
      .empty { padding: 12px; color: rgba(0,0,0,0.6); }
      .rate-row { display:flex; align-items:center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
      .totals { display:flex; gap: 16px; align-items:center; }
+     .spacer-divider { margin-inline: 8px; height: 32px; align-self: center; }
      .price-row { display:flex; align-items:center; gap: 12px; }
-     @media (min-width: 900px) {
-        .grid { grid-template-columns: 1fr 2fr; }
+      @media (min-width: 900px) {
+        .grid { grid-template-columns: 1fr; }
         .row { grid-template-columns: repeat(6, 1fr); }
-     }`
+      }`
   ]
 })
 export class CustomerDetailComponent {
