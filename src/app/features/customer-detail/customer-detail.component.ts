@@ -11,7 +11,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators, FormsModule } from '@angular/forms';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Item } from '../../models/item';
 import { ItemEditDialogComponent } from './item-edit-dialog.component';
@@ -21,6 +21,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.component';
+import { CreateOrderDialogComponent, CreateOrderResult } from './create-order-dialog.component';
+import { Order } from '../../models/order';
 
 @Component({
   selector: 'app-customer-detail',
@@ -29,6 +31,7 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
     CommonModule,
     RouterLink,
     ReactiveFormsModule,
+    FormsModule,
     MatCardModule,
     MatTableModule,
     MatButtonModule,
@@ -247,6 +250,9 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
                   <button mat-icon-button color="warn" (click)="archive(i)" aria-label="Archive item">
                     <mat-icon>delete</mat-icon>
                   </button>
+                  <button mat-icon-button color="primary" (click)="createOrder(i)" aria-label="Create order">
+                    <mat-icon>shopping_cart_checkout</mat-icon>
+                  </button>
             </td>
             <td mat-footer-cell *matFooterCellDef></td>
           </ng-container>
@@ -293,6 +299,62 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
             </div>
             <div *ngIf="archivedItems().length === 0" class="empty">No archived items.</div>
           </mat-tab>
+          <mat-tab label="Orders">
+            <div class="table-wrap">
+              <table mat-table [dataSource]="orders()" class="mat-elevation-z1 wide-table">
+                <ng-container matColumnDef="date">
+                  <th mat-header-cell *matHeaderCellDef>Date</th>
+                  <td mat-cell *matCellDef="let o">{{ o.date | date: 'mediumDate' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="item">
+                  <th mat-header-cell *matHeaderCellDef>Item</th>
+                  <td mat-cell *matCellDef="let o">{{ o.itemName }}</td>
+                </ng-container>
+                <ng-container matColumnDef="qty">
+                  <th mat-header-cell *matHeaderCellDef>Qty</th>
+                  <td mat-cell *matCellDef="let o">{{ o.quantity }}</td>
+                </ng-container>
+                <ng-container matColumnDef="material">
+                  <th mat-header-cell *matHeaderCellDef>Material/unit</th>
+                  <td mat-cell *matCellDef="let o">{{ o.materialCostPerFulfillment | currency:'USD' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="materialTotal">
+                  <th mat-header-cell *matHeaderCellDef>Material total</th>
+                  <td mat-cell *matCellDef="let o">{{ (o.quantity * o.materialCostPerFulfillment) | currency:'USD' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="status">
+                  <th mat-header-cell *matHeaderCellDef>Status</th>
+                  <td mat-cell *matCellDef="let o">
+                    <mat-select [(ngModel)]="o.status" (selectionChange)="updateOrderStatus(o)">
+                      <mat-option value="Preparing">Preparing</mat-option>
+                      <mat-option value="Shipped">Shipped</mat-option>
+                      <mat-option value="Delivered">Delivered</mat-option>
+                      <mat-option value="Cancelled">Cancelled</mat-option>
+                    </mat-select>
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="tracking">
+                  <th mat-header-cell *matHeaderCellDef>Tracking</th>
+                  <td mat-cell *matCellDef="let o">{{ o.trackingNumber || '-' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="email">
+                  <th mat-header-cell *matHeaderCellDef>Email</th>
+                  <td mat-cell *matCellDef="let o">
+                    <a [href]="mailtoHref(o)" target="_blank" rel="noopener">Compose</a>
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>Actions</th>
+                  <td mat-cell *matCellDef="let o">
+                    <button mat-button color="warn" (click)="cancelOrder(o)" [disabled]="o.status==='Cancelled'">Cancel</button>
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="orderColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: orderColumns;"></tr>
+              </table>
+            </div>
+          </mat-tab>
         </mat-tab-group>
       </mat-card>
     </div>
@@ -333,6 +395,7 @@ export class CustomerDetailComponent {
 
   columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'prepUnit', 'fulfillmentUnit', 'prep', 'fulfillment', 'monthlyCost', 'actions'];
   archivedColumns = ['name', 'barcode', 'dimensions', 'reason', 'notes', 'actions'];
+  orderColumns = ['date','item','qty','material','materialTotal','status','tracking','email','actions'];
 
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
@@ -434,6 +497,42 @@ export class CustomerDetailComponent {
     });
     this.form.reset({ name: '', quantity: 1, barcode: '', widthCm: 0, lengthCm: 0, heightCm: 0, location: '', dateAdded: new Date(), autoPricing: true, manualMonthlyCost: 0, prepAuto: true, manualPrepCost: 0, fulfillAuto: true, manualFulfillmentCost: 0 });
     this.snack.open('Item added', 'OK', { duration: 2000 });
+  }
+
+  // Orders
+  orders = computed(() => this.store.ordersFor(this.email() ?? ''));
+
+  createOrder(item: Item) {
+    const ref = this.dialog.open(CreateOrderDialogComponent, {
+      data: { itemId: item.id, itemName: item.name, maxQty: Number(item.quantity) || 0, customerEmail: this.customer()?.email ?? '' },
+      width: '560px'
+    });
+    ref.afterClosed().subscribe((res?: CreateOrderResult) => {
+      if (res) {
+        const out = this.store.createOrder(this.email(), { ...res, itemName: item.name });
+        if (!out.ok) {
+          this.snack.open(out.error || 'Failed to create order', 'OK', { duration: 2500 });
+        } else {
+          this.snack.open('Order created', 'OK', { duration: 2000 });
+        }
+      }
+    });
+  }
+
+  cancelOrder(o: Order) {
+    this.store.cancelOrder(this.email(), o.id);
+    this.snack.open('Order cancelled; stock restored', 'OK', { duration: 2000 });
+  }
+
+  updateOrderStatus(o: Order) {
+    this.store.updateOrder(this.email(), o.id, { status: o.status });
+    this.snack.open('Order updated', 'OK', { duration: 1500 });
+  }
+
+  mailtoHref(o: Order): string {
+    const subject = encodeURIComponent(o.emailSubject || '');
+    const body = encodeURIComponent(o.emailBody || '');
+    return `mailto:${encodeURIComponent(this.customer()?.email ?? '')}?subject=${subject}&body=${body}`;
   }
 
   archive(item: Item) {

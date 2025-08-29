@@ -3,11 +3,13 @@ import { isPlatformBrowser } from '@angular/common';
 import { Customer } from '../models/customer';
 import { Item } from '../models/item';
 import { ArchivedItemRecord } from '../models/archived';
+import { Order, OrderStatus } from '../models/order';
 
 interface StorageData {
   customers: Customer[];
   itemsByEmail: Record<string, Item[]>;
   archivedByEmail: Record<string, ArchivedItemRecord[] | Item[]>; // tolerate legacy arrays of Item
+  ordersByEmail: Record<string, Order[]>;
 }
 
 const STORAGE_KEY = 'storageApp.data.v1';
@@ -17,6 +19,7 @@ export class StorageService {
   readonly customers = signal<Customer[]>([]);
   readonly itemsByEmail = signal<Record<string, Item[]>>({});
   readonly archivedByEmail = signal<Record<string, ArchivedItemRecord[]>>({});
+  readonly ordersByEmail = signal<Record<string, Order[]>>({});
   private readonly platformId = inject(PLATFORM_ID);
 
   constructor() {
@@ -41,6 +44,7 @@ export class StorageService {
         );
       });
       this.archivedByEmail.set(migrated);
+      this.ordersByEmail.set(parsed.ordersByEmail ?? {});
     } catch {
       // ignore
     }
@@ -52,6 +56,7 @@ export class StorageService {
       customers: this.customers(),
       itemsByEmail: this.itemsByEmail(),
       archivedByEmail: this.archivedByEmail(),
+      ordersByEmail: this.ordersByEmail(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }
@@ -65,6 +70,7 @@ export class StorageService {
     this.customers.set(list);
     if (!this.itemsByEmail()[email]) this.itemsByEmail.set({ ...this.itemsByEmail(), [email]: [] });
     if (!this.archivedByEmail()[email]) this.archivedByEmail.set({ ...this.archivedByEmail(), [email]: [] });
+    if (!this.ordersByEmail()[email]) this.ordersByEmail.set({ ...this.ordersByEmail(), [email]: [] });
     this.persist();
     return { ok: true };
   }
@@ -150,6 +156,82 @@ export class StorageService {
     const key = email.trim().toLowerCase();
     const updated = this.customers().map((c) => (c.email.toLowerCase() === key ? { ...c, ...patch } : c));
     this.customers.set(updated);
+    this.persist();
+  }
+
+  ordersFor(email: string): Order[] {
+    const key = email.trim().toLowerCase();
+    return this.ordersByEmail()[key] ?? [];
+  }
+
+  createOrder(email: string, input: Omit<Order, 'id' | 'createdAt' | 'itemName'> & { itemName?: string }): { ok: boolean; error?: string } {
+    const key = email.trim().toLowerCase();
+    const items = this.itemsByEmail()[key] ?? [];
+    const idx = items.findIndex(i => i.id === input.itemId);
+    if (idx === -1) return { ok: false, error: 'Item not found' };
+    const item = items[idx];
+    const qty = Math.max(0, Math.floor(Number(input.quantity)));
+    if (qty <= 0) return { ok: false, error: 'Quantity must be > 0' };
+    if ((item.quantity || 0) < qty) return { ok: false, error: 'Insufficient quantity in storage' };
+    // Decrement stock
+    const updatedItem = { ...item, quantity: (Number(item.quantity) || 0) - qty } as Item;
+    const newItems = [...items];
+    newItems[idx] = updatedItem;
+    this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: newItems });
+
+    const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)) as string;
+    const order: Order = {
+      id,
+      itemId: input.itemId,
+      itemName: input.itemName ?? item.name,
+      quantity: qty,
+      date: input.date,
+      materialCostPerFulfillment: Number(input.materialCostPerFulfillment) || 0,
+      status: input.status as OrderStatus,
+      trackingNumber: input.trackingNumber,
+      emailSubject: input.emailSubject,
+      emailBody: input.emailBody,
+      createdAt: new Date().toISOString(),
+    };
+    const orders = this.ordersByEmail()[key] ?? [];
+    this.ordersByEmail.set({ ...this.ordersByEmail(), [key]: [...orders, order] });
+    this.persist();
+    return { ok: true };
+  }
+
+  updateOrder(email: string, orderId: string, patch: Partial<Order>): void {
+    const key = email.trim().toLowerCase();
+    const orders = this.ordersByEmail()[key] ?? [];
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx === -1) return;
+    const updated = { ...orders[idx], ...patch } as Order;
+    const copy = [...orders];
+    copy[idx] = updated;
+    this.ordersByEmail.set({ ...this.ordersByEmail(), [key]: copy });
+    this.persist();
+  }
+
+  cancelOrder(email: string, orderId: string): void {
+    const key = email.trim().toLowerCase();
+    const orders = this.ordersByEmail()[key] ?? [];
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx === -1) return;
+    const order = orders[idx];
+    if (order.status === 'Cancelled') return; // already cancelled
+    // Restock
+    const items = this.itemsByEmail()[key] ?? [];
+    const i = items.findIndex(it => it.id === order.itemId);
+    if (i !== -1) {
+      const updatedItem = { ...items[i], quantity: (Number(items[i].quantity) || 0) + order.quantity } as Item;
+      const newItems = [...items];
+      newItems[i] = updatedItem;
+      this.itemsByEmail.set({ ...this.itemsByEmail(), [key]: newItems });
+    }
+    // Update order status
+    const updated = { ...order, status: 'Cancelled' as OrderStatus };
+    const newOrders = [...orders];
+    newOrders[idx] = updated;
+    this.ordersByEmail.set({ ...this.ordersByEmail(), [key]: newOrders });
     this.persist();
   }
 }
