@@ -56,12 +56,22 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
           <mat-label>Monthly rate per m³</mat-label>
           <input matInput type="number" min="0" step="0.01" formControlName="ratePerM3" />
         </mat-form-field>
-        <button mat-stroked-button color="primary">Save Rate</button>
+        <mat-form-field appearance="outline">
+          <mat-label>Item Prep (per unit)</mat-label>
+          <input matInput type="number" min="0" step="0.01" formControlName="prepCostPerUnit" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Fulfillment (per unit)</mat-label>
+          <input matInput type="number" min="0" step="0.01" formControlName="fulfillmentCostPerUnit" />
+        </mat-form-field>
+        <button mat-stroked-button color="primary">Save</button>
         <mat-divider class="spacer-divider"></mat-divider>
         <mat-chip-set>
           <mat-chip color="primary" selected>Auto Items: {{ itemsAuto().length }}</mat-chip>
           <mat-chip color="primary" selected>Billed m³: {{ billedUnitsAuto() }}</mat-chip>
-          <mat-chip color="accent" selected>Total Monthly: {{ totalMonthlyCost() | currency:'USD':'symbol' }}</mat-chip>
+          <mat-chip color="accent" selected>Storage Monthly: {{ totalStorageCost() | currency:'USD':'symbol' }}</mat-chip>
+          <mat-chip color="accent" selected>Prep: {{ totalPrepCost() | currency:'USD':'symbol' }}</mat-chip>
+          <mat-chip color="accent" selected>Fulfillment: {{ totalFulfillmentCost() | currency:'USD':'symbol' }}</mat-chip>
         </mat-chip-set>
       </form>
     </mat-card>
@@ -132,6 +142,32 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
                 </mat-form-field>
               </ng-template>
             </div>
+
+            <div class="full price-row">
+              <mat-slide-toggle formControlName="prepAuto">Item Prep (auto)</mat-slide-toggle>
+              <ng-container *ngIf="form.controls.prepAuto.value; else manualPrep">
+                <span class="price-hint">Auto: {{ (prepDefault() * (form.controls.quantity.value || 0)) | currency:'USD' }}</span>
+              </ng-container>
+              <ng-template #manualPrep>
+                <mat-form-field appearance="outline">
+                  <mat-label>Prep (per unit)</mat-label>
+                  <input matInput type="number" min="0" step="0.01" formControlName="manualPrepCost" />
+                </mat-form-field>
+              </ng-template>
+            </div>
+
+            <div class="full price-row">
+              <mat-slide-toggle formControlName="fulfillAuto">Fulfillment (auto)</mat-slide-toggle>
+              <ng-container *ngIf="form.controls.fulfillAuto.value; else manualFulfill">
+                <span class="price-hint">Auto: {{ (fulfillmentDefault() * (form.controls.quantity.value || 0)) | currency:'USD' }}</span>
+              </ng-container>
+              <ng-template #manualFulfill>
+                <mat-form-field appearance="outline">
+                  <mat-label>Fulfillment (per unit)</mat-label>
+                  <input matInput type="number" min="0" step="0.01" formControlName="manualFulfillmentCost" />
+                </mat-form-field>
+              </ng-template>
+            </div>
           </div>
           <button mat-flat-button color="primary" [disabled]="form.invalid">Add Item</button>
         </form>
@@ -140,7 +176,8 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
       <mat-card appearance="outlined">
         <mat-tab-group>
           <mat-tab label="Items">
-            <table mat-table [dataSource]="items()" class="mat-elevation-z1">
+            <div class="table-wrap">
+            <table mat-table [dataSource]="items()" class="mat-elevation-z1 wide-table">
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef>Name</th>
             <td mat-cell *matCellDef="let i">{{ i.name }}</td>
@@ -176,9 +213,29 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
             <td mat-cell *matCellDef="let i">{{ volumeM3(i) | number:'1.3-3' }}</td>
             <td mat-footer-cell *matFooterCellDef></td>
           </ng-container>
+          <ng-container matColumnDef="prepUnit">
+            <th mat-header-cell *matHeaderCellDef>Prep/unit</th>
+            <td mat-cell *matCellDef="let i">{{ prepUnitCost(i) | currency:'USD' }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="fulfillmentUnit">
+            <th mat-header-cell *matHeaderCellDef>Fulfillment/unit</th>
+            <td mat-cell *matCellDef="let i">{{ fulfillUnitCost(i) | currency:'USD' }}</td>
+            <td mat-footer-cell *matFooterCellDef></td>
+          </ng-container>
+          <ng-container matColumnDef="prep">
+            <th mat-header-cell *matHeaderCellDef>Prep</th>
+            <td mat-cell *matCellDef="let i">{{ prepCost(i) | currency:'USD' }}</td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalPrepCost() | currency:'USD' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="fulfillment">
+            <th mat-header-cell *matHeaderCellDef>Fulfillment</th>
+            <td mat-cell *matCellDef="let i">{{ fulfillmentCost(i) | currency:'USD' }}</td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalFulfillmentCost() | currency:'USD' }}</td>
+          </ng-container>
           <ng-container matColumnDef="monthlyCost">
             <th mat-header-cell *matHeaderCellDef>Monthly Cost</th>
-            <td mat-cell *matCellDef="let i">{{ itemMonthlyCost(i) | currency:'USD' }}</td>
+            <td mat-cell *matCellDef="let i">{{ storageCost(i) | currency:'USD' }}</td>
             <td mat-footer-cell *matFooterCellDef>{{ totalMonthlyCost() | currency:'USD' }}</td>
           </ng-container>
           <ng-container matColumnDef="actions">
@@ -198,10 +255,12 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
               <tr mat-row *matRowDef="let row; columns: columns;"></tr>
               <tr mat-footer-row *matFooterRowDef="columns"></tr>
             </table>
+            </div>
             <div *ngIf="items().length === 0" class="empty">No items yet.</div>
           </mat-tab>
           <mat-tab label="Archived">
-            <table mat-table [dataSource]="archivedItems()" class="mat-elevation-z1">
+            <div class="table-wrap">
+            <table mat-table [dataSource]="archivedItems()" class="mat-elevation-z1 wide-table">
               <ng-container matColumnDef="name">
                 <th mat-header-cell *matHeaderCellDef>Name</th>
                 <td mat-cell *matCellDef="let r">{{ r.item.name }}</td>
@@ -231,6 +290,7 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
               <tr mat-header-row *matHeaderRowDef="archivedColumns"></tr>
               <tr mat-row *matRowDef="let row; columns: archivedColumns;"></tr>
             </table>
+            </div>
             <div *ngIf="archivedItems().length === 0" class="empty">No archived items.</div>
           </mat-tab>
         </mat-tab-group>
@@ -243,6 +303,8 @@ import { ArchiveDialogComponent, ArchiveDialogResult } from './archive-dialog.co
      .full { width: 100%; }
      h2, h3 { margin: 0 0 8px; }
      table { width: 100%; }
+     .wide-table { min-width: 1200px; }
+     .table-wrap { width: 100%; overflow-x: auto; }
      .empty { padding: 12px; color: rgba(0,0,0,0.6); }
      .rate-row { display:flex; align-items:center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
      .totals { display:flex; gap: 16px; align-items:center; }
@@ -266,8 +328,10 @@ export class CustomerDetailComponent {
   readonly items = computed(() => this.store.itemsFor(this.email() ?? ''));
   readonly archivedItems = computed(() => this.store.archivedItemsFor(this.email() ?? ''));
   readonly ratePerM3 = computed(() => this.customer()?.ratePerM3 ?? 10);
+  readonly prepDefault = computed(() => this.customer()?.prepCostPerUnit ?? 0);
+  readonly fulfillmentDefault = computed(() => this.customer()?.fulfillmentCostPerUnit ?? 0);
 
-  columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'monthlyCost', 'actions'];
+  columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'prepUnit', 'fulfillmentUnit', 'prep', 'fulfillment', 'monthlyCost', 'actions'];
   archivedColumns = ['name', 'barcode', 'dimensions', 'reason', 'notes', 'actions'];
 
   readonly form = this.fb.nonNullable.group({
@@ -281,10 +345,17 @@ export class CustomerDetailComponent {
     dateAdded: [new Date(), Validators.required],
     autoPricing: [true],
     manualMonthlyCost: [0],
+    // Prep & Fulfillment controls
+    prepAuto: [true],
+    manualPrepCost: [0],
+    fulfillAuto: [true],
+    manualFulfillmentCost: [0],
   });
 
   readonly rateForm = this.fb.nonNullable.group({
     ratePerM3: [this.ratePerM3()],
+    prepCostPerUnit: [this.prepDefault()],
+    fulfillmentCostPerUnit: [this.fulfillmentDefault()],
   });
 
   volumeM3(i: Item): number {
@@ -293,11 +364,21 @@ export class CustomerDetailComponent {
     return cm3 / 1_000_000;
   }
 
-  itemMonthlyCost(i: Item): number {
-    if (i.pricingMode === 'manual' && typeof i.manualMonthlyCost === 'number') {
-      return i.manualMonthlyCost;
-    }
-    return this.itemBilledUnits(i) * this.ratePerM3();
+  // Extras helpers
+  prepUnitCost(i: Item): number {
+    return i.prepPricingMode === 'manual' ? (Number(i.manualPrepCost) || 0) : this.prepDefault();
+  }
+  fulfillUnitCost(i: Item): number {
+    return i.fulfillmentPricingMode === 'manual' ? (Number(i.manualFulfillmentCost) || 0) : this.fulfillmentDefault();
+  }
+  prepCost(i: Item): number { return (Number(i.quantity) || 0) * this.prepUnitCost(i); }
+  fulfillmentCost(i: Item): number { return (Number(i.quantity) || 0) * this.fulfillUnitCost(i); }
+
+  storageCost(i: Item): number {
+    const storage = (i.pricingMode === 'manual' && typeof i.manualMonthlyCost === 'number')
+      ? Number(i.manualMonthlyCost)
+      : this.itemBilledUnits(i) * this.ratePerM3();
+    return storage;
   }
 
   // Auto-priced items aggregation (per-item minimum 1 m³, ceil per item)
@@ -310,17 +391,26 @@ export class CustomerDetailComponent {
   billedUnitsAuto = computed(() => this.itemsAuto().reduce((sum, it) => sum + this.itemBilledUnits(it), 0));
   totalAutoCost = computed(() => this.billedUnitsAuto() * this.ratePerM3());
 
-  // Manual-priced items sum
+  // Manual-priced items sum (storage-only, unused in final total)
   totalManualCost = computed(() => this.items().filter(i => i.pricingMode === 'manual').reduce((sum, it) => sum + (Number(it.manualMonthlyCost) || 0), 0));
 
-  totalMonthlyCost = computed(() => this.totalAutoCost() + this.totalManualCost());
+  // Storage-only total (what shows under "Monthly Cost")
+  totalStorageCost = computed(() => this.items().reduce((sum, it) => sum + ((it.pricingMode === 'manual' && typeof it.manualMonthlyCost === 'number') ? Number(it.manualMonthlyCost) : this.itemBilledUnits(it) * this.ratePerM3()), 0));
+  // Extras totals
+  totalPrepCost = computed(() => this.items().reduce((sum, it) => sum + this.prepCost(it), 0));
+  totalFulfillmentCost = computed(() => this.items().reduce((sum, it) => sum + this.fulfillmentCost(it), 0));
+  // Grand total if needed elsewhere
+  totalMonthlyCost = computed(() => this.totalStorageCost() + this.totalPrepCost() + this.totalFulfillmentCost());
 
   estimatedNewItemCost() {
     const raw = this.form.getRawValue();
     if (!raw.autoPricing) return Number(raw.manualMonthlyCost || 0);
     const addedVol = ((Number(raw.widthCm) || 0) * (Number(raw.lengthCm) || 0) * (Number(raw.heightCm) || 0) * (Number(raw.quantity) || 0)) / 1_000_000;
     const units = Math.max(1, Math.ceil(addedVol));
-    return units * this.ratePerM3();
+    const storage = units * this.ratePerM3();
+    const prep = (raw.prepAuto ? this.prepDefault() : Number(raw.manualPrepCost || 0)) * Number(raw.quantity || 0);
+    const fulfill = (raw.fulfillAuto ? this.fulfillmentDefault() : Number(raw.manualFulfillmentCost || 0)) * Number(raw.quantity || 0);
+    return storage + prep + fulfill;
   }
 
   onAddItem() {
@@ -335,10 +425,14 @@ export class CustomerDetailComponent {
       heightCm: Number(raw.heightCm),
       pricingMode: raw.autoPricing ? 'auto' : 'manual',
       manualMonthlyCost: raw.autoPricing ? undefined : Number(raw.manualMonthlyCost || 0),
+      prepPricingMode: raw.prepAuto ? 'auto' : 'manual',
+      manualPrepCost: raw.prepAuto ? undefined : Number(raw.manualPrepCost || 0),
+      fulfillmentPricingMode: raw.fulfillAuto ? 'auto' : 'manual',
+      manualFulfillmentCost: raw.fulfillAuto ? undefined : Number(raw.manualFulfillmentCost || 0),
       location: raw.location,
       dateAdded: date,
     });
-    this.form.reset({ name: '', quantity: 1, barcode: '', widthCm: 0, lengthCm: 0, heightCm: 0, location: '', dateAdded: new Date(), autoPricing: true, manualMonthlyCost: 0 });
+    this.form.reset({ name: '', quantity: 1, barcode: '', widthCm: 0, lengthCm: 0, heightCm: 0, location: '', dateAdded: new Date(), autoPricing: true, manualMonthlyCost: 0, prepAuto: true, manualPrepCost: 0, fulfillAuto: true, manualFulfillmentCost: 0 });
     this.snack.open('Item added', 'OK', { duration: 2000 });
   }
 
@@ -354,7 +448,7 @@ export class CustomerDetailComponent {
 
   edit(item: Item) {
     const ref = this.dialog.open(ItemEditDialogComponent, {
-      data: { item, ratePerM3: this.ratePerM3() },
+      data: { item, ratePerM3: this.ratePerM3(), prepDefault: this.prepDefault(), fulfillmentDefault: this.fulfillmentDefault() },
       width: '520px',
     });
     ref.afterClosed().subscribe((updated?: Item) => {
@@ -371,10 +465,14 @@ export class CustomerDetailComponent {
   }
 
   saveRate() {
-    const val = Number(this.rateForm.controls.ratePerM3.value);
-    if (!isNaN(val)) {
-      this.store.updateCustomer(this.email(), { ratePerM3: val });
-      this.snack.open('Rate updated', 'OK', { duration: 2000 });
-    }
+    const rate = Number(this.rateForm.controls.ratePerM3.value);
+    const prep = Number(this.rateForm.controls.prepCostPerUnit.value);
+    const fulfillment = Number(this.rateForm.controls.fulfillmentCostPerUnit.value);
+    const patch: any = {};
+    if (!isNaN(rate)) patch.ratePerM3 = rate;
+    if (!isNaN(prep)) patch.prepCostPerUnit = prep;
+    if (!isNaN(fulfillment)) patch.fulfillmentCostPerUnit = fulfillment;
+    this.store.updateCustomer(this.email(), patch);
+    this.snack.open('Rates updated', 'OK', { duration: 2000 });
   }
 }

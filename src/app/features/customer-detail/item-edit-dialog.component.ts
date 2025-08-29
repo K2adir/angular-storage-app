@@ -14,6 +14,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 export interface ItemEditData {
   item: Item;
   ratePerM3: number;
+  prepDefault: number;
+  fulfillmentDefault: number;
 }
 
 @Component({
@@ -94,6 +96,32 @@ export interface ItemEditData {
         </ng-template>
       </div>
 
+      <div class="full price-row">
+        <mat-slide-toggle formControlName="prepAuto">Item Prep (auto)</mat-slide-toggle>
+        <ng-container *ngIf="form.controls.prepAuto.value; else manualPrep">
+          <span class="price-hint">Auto (per unit): {{ data.prepDefault | currency:'USD' }}</span>
+        </ng-container>
+        <ng-template #manualPrep>
+          <mat-form-field appearance="outline">
+            <mat-label>Prep (per unit)</mat-label>
+            <input matInput type="number" min="0" step="0.01" formControlName="manualPrepCost" />
+          </mat-form-field>
+        </ng-template>
+      </div>
+
+      <div class="full price-row">
+        <mat-slide-toggle formControlName="fulfillAuto">Fulfillment (auto)</mat-slide-toggle>
+        <ng-container *ngIf="form.controls.fulfillAuto.value; else manualFulfill">
+          <span class="price-hint">Auto (per unit): {{ data.fulfillmentDefault | currency:'USD' }}</span>
+        </ng-container>
+        <ng-template #manualFulfill>
+          <mat-form-field appearance="outline">
+            <mat-label>Fulfillment (per unit)</mat-label>
+            <input matInput type="number" min="0" step="0.01" formControlName="manualFulfillmentCost" />
+          </mat-form-field>
+        </ng-template>
+      </div>
+
       <div class="actions">
         <button mat-button type="button" (click)="close()">Cancel</button>
         <button mat-flat-button color="primary" [disabled]="form.invalid">Save</button>
@@ -110,7 +138,7 @@ export interface ItemEditData {
 })
 export class ItemEditDialogComponent {
   private readonly ref = inject(MatDialogRef<ItemEditDialogComponent, Item | undefined>);
-  private readonly data = inject<ItemEditData>(MAT_DIALOG_DATA);
+  readonly data = inject<ItemEditData>(MAT_DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
 
   readonly form = this.fb.nonNullable.group({
@@ -124,6 +152,10 @@ export class ItemEditDialogComponent {
     dateAdded: [new Date(this.data.item.dateAdded), Validators.required],
     autoPricing: [this.data.item.pricingMode !== 'manual'],
     manualMonthlyCost: [this.data.item.manualMonthlyCost ?? 0],
+    prepAuto: [this.data.item.prepPricingMode !== 'manual'],
+    manualPrepCost: [this.data.item.manualPrepCost ?? 0],
+    fulfillAuto: [this.data.item.fulfillmentPricingMode !== 'manual'],
+    manualFulfillmentCost: [this.data.item.manualFulfillmentCost ?? 0],
   });
 
   close() {
@@ -142,6 +174,10 @@ export class ItemEditDialogComponent {
       heightCm: Number(raw.heightCm),
       pricingMode: raw.autoPricing ? 'auto' : 'manual',
       manualMonthlyCost: raw.autoPricing ? undefined : Number(raw.manualMonthlyCost || 0),
+      prepPricingMode: raw.prepAuto ? 'auto' : 'manual',
+      manualPrepCost: raw.prepAuto ? undefined : Number(raw.manualPrepCost || 0),
+      fulfillmentPricingMode: raw.fulfillAuto ? 'auto' : 'manual',
+      manualFulfillmentCost: raw.fulfillAuto ? undefined : Number(raw.manualFulfillmentCost || 0),
       location: raw.location,
       dateAdded: raw.dateAdded instanceof Date ? raw.dateAdded.toISOString() : String(raw.dateAdded),
     };
@@ -156,6 +192,11 @@ export class ItemEditDialogComponent {
 
   computedCost(): number {
     const units = Math.max(1, Math.ceil(this.volumeM3()));
-    return units * this.data.ratePerM3;
+    const storage = units * this.data.ratePerM3;
+    const raw = this.form.getRawValue();
+    const prepPerUnit = raw.prepAuto ? this.data.prepDefault : Number(raw.manualPrepCost || 0);
+    const fulfillPerUnit = raw.fulfillAuto ? this.data.fulfillmentDefault : Number(raw.manualFulfillmentCost || 0);
+    const extras = (Number(raw.quantity) || 0) * (prepPerUnit + fulfillPerUnit);
+    return storage + extras;
   }
 }
