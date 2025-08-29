@@ -1,5 +1,7 @@
 export interface Customer {
-  name: string;
+  name: string; // display name
+  firstName?: string;
+  lastName?: string;
   email: string; // unique id
   phone?: string;
   notes?: string;
@@ -8,4 +10,13 @@ export interface Customer {
   // Default per-unit add-on costs
   prepCostPerUnit?: number; // Item Prep cost per unit
   fulfillmentCostPerUnit?: number; // Fulfillment cost per unit
+  // Address fields
+  company?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  county?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
 }
