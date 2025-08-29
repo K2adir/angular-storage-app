@@ -35,6 +35,7 @@ export interface ItemEditData {
   ],
   template: `
     <h2 mat-dialog-title>Edit Item</h2>
+    <div mat-dialog-content>
     <form [formGroup]="form" (ngSubmit)="save()" class="content">
       <mat-form-field appearance="outline" class="full">
         <mat-label>Name</mat-label>
@@ -122,16 +123,16 @@ export interface ItemEditData {
         </ng-template>
       </div>
 
-      <div class="actions">
-        <button mat-button type="button" (click)="close()">Cancel</button>
-        <button mat-flat-button color="primary" [disabled]="form.invalid">Save</button>
-      </div>
     </form>
+    </div>
+    <div mat-dialog-actions align="end">
+      <button mat-button type="button" (click)="close()">Cancel</button>
+      <button mat-flat-button color="primary" [disabled]="form.invalid">Save</button>
+    </div>
   `,
   styles: [
-    `.content { display:grid; grid-template-columns: 1fr; gap: 12px; padding: 8px 0; }
+    `.content { display:grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px; }
      .full { width: 100%; }
-     .actions { display:flex; justify-content:flex-end; gap: 8px; margin-top: 8px; }
      .price-row { display:flex; align-items:center; gap: 12px; }
     `
   ]

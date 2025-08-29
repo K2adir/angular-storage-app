@@ -543,7 +543,7 @@ export class CustomerDetailComponent {
   edit(item: Item) {
     const ref = this.dialog.open(ItemEditDialogComponent, {
       data: { item, ratePerM3: this.ratePerM3(), prepDefault: this.prepDefault(), fulfillmentDefault: this.fulfillmentDefault() },
-      width: '520px',
+      width: '560px',
     });
     ref.afterClosed().subscribe((updated?: Item) => {
       if (updated) {
