@@ -226,16 +226,6 @@ import { Order } from '../../models/order';
             <td mat-cell *matCellDef="let i">{{ fulfillUnitCost(i) | currency:'USD' }}</td>
             <td mat-footer-cell *matFooterCellDef></td>
           </ng-container>
-          <ng-container matColumnDef="prep">
-            <th mat-header-cell *matHeaderCellDef>Prep</th>
-            <td mat-cell *matCellDef="let i">{{ prepCost(i) | currency:'USD' }}</td>
-            <td mat-footer-cell *matFooterCellDef>{{ totalPrepCost() | currency:'USD' }}</td>
-          </ng-container>
-          <ng-container matColumnDef="fulfillment">
-            <th mat-header-cell *matHeaderCellDef>Fulfillment</th>
-            <td mat-cell *matCellDef="let i">{{ fulfillmentCost(i) | currency:'USD' }}</td>
-            <td mat-footer-cell *matFooterCellDef>{{ totalFulfillmentCost() | currency:'USD' }}</td>
-          </ng-container>
           <ng-container matColumnDef="monthlyCost">
             <th mat-header-cell *matHeaderCellDef>Monthly Cost</th>
             <td mat-cell *matCellDef="let i">{{ storageCost(i) | currency:'USD' }}</td>
@@ -393,7 +383,7 @@ export class CustomerDetailComponent {
   readonly prepDefault = computed(() => this.customer()?.prepCostPerUnit ?? 0);
   readonly fulfillmentDefault = computed(() => this.customer()?.fulfillmentCostPerUnit ?? 0);
 
-  columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'prepUnit', 'fulfillmentUnit', 'prep', 'fulfillment', 'monthlyCost', 'actions'];
+  columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'prepUnit', 'fulfillmentUnit', 'monthlyCost', 'actions'];
   archivedColumns = ['name', 'barcode', 'dimensions', 'reason', 'notes', 'actions'];
   orderColumns = ['date','item','qty','material','materialTotal','status','tracking','email','actions'];
 
