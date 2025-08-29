@@ -297,22 +297,42 @@ import { Order } from '../../models/order';
                 <ng-container matColumnDef="date">
                   <th mat-header-cell *matHeaderCellDef>Date</th>
                   <td mat-cell *matCellDef="let o">{{ o.date | date: 'mediumDate' }}</td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="item">
                   <th mat-header-cell *matHeaderCellDef>Item</th>
                   <td mat-cell *matCellDef="let o">{{ o.itemName }}</td>
+                  <td mat-footer-cell *matFooterCellDef>Total</td>
                 </ng-container>
                 <ng-container matColumnDef="qty">
                   <th mat-header-cell *matHeaderCellDef>Qty</th>
                   <td mat-cell *matCellDef="let o">{{ o.quantity }}</td>
+                  <td mat-footer-cell *matFooterCellDef>{{ totalOrderQuantity() }}</td>
                 </ng-container>
                 <ng-container matColumnDef="material">
                   <th mat-header-cell *matHeaderCellDef>Material/unit</th>
                   <td mat-cell *matCellDef="let o">{{ o.materialCostPerFulfillment | currency:'USD' }}</td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="materialTotal">
                   <th mat-header-cell *matHeaderCellDef>Material total</th>
-                  <td mat-cell *matCellDef="let o">{{ (o.quantity * o.materialCostPerFulfillment) | currency:'USD' }}</td>
+                  <td mat-cell *matCellDef="let o">{{ orderMaterialTotal(o) | currency:'USD' }}</td>
+                  <td mat-footer-cell *matFooterCellDef>{{ totalOrderMaterial() | currency:'USD' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="prepUnit">
+                  <th mat-header-cell *matHeaderCellDef>Prep/unit</th>
+                  <td mat-cell *matCellDef="let o">{{ orderPrepUnit(o) | currency:'USD' }}</td>
+                  <td mat-footer-cell *matFooterCellDef>{{ totalOrderPrep() | currency:'USD' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="fulfillmentUnit">
+                  <th mat-header-cell *matHeaderCellDef>Fulfillment/unit</th>
+                  <td mat-cell *matCellDef="let o">{{ orderFulfillmentUnit(o) | currency:'USD' }}</td>
+                  <td mat-footer-cell *matFooterCellDef>{{ totalOrderFulfillment() | currency:'USD' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="orderTotal">
+                  <th mat-header-cell *matHeaderCellDef>Order total</th>
+                  <td mat-cell *matCellDef="let o">{{ orderGrandTotal(o) | currency:'USD' }}</td>
+                  <td mat-footer-cell *matFooterCellDef>{{ totalOrdersGrand() | currency:'USD' }}</td>
                 </ng-container>
                 <ng-container matColumnDef="status">
                   <th mat-header-cell *matHeaderCellDef>Status</th>
@@ -324,26 +344,31 @@ import { Order } from '../../models/order';
                       <mat-option value="Cancelled">Cancelled</mat-option>
                     </mat-select>
                   </td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="tracking">
                   <th mat-header-cell *matHeaderCellDef>Tracking</th>
                   <td mat-cell *matCellDef="let o">{{ o.trackingNumber || '-' }}</td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="email">
                   <th mat-header-cell *matHeaderCellDef>Email</th>
                   <td mat-cell *matCellDef="let o">
                     <a [href]="mailtoHref(o)" target="_blank" rel="noopener">Compose</a>
                   </td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
                 <ng-container matColumnDef="actions">
                   <th mat-header-cell *matHeaderCellDef>Actions</th>
                   <td mat-cell *matCellDef="let o">
                     <button mat-button color="warn" (click)="cancelOrder(o)" [disabled]="o.status==='Cancelled'">Cancel</button>
                   </td>
+                  <td mat-footer-cell *matFooterCellDef></td>
                 </ng-container>
 
                 <tr mat-header-row *matHeaderRowDef="orderColumns"></tr>
                 <tr mat-row *matRowDef="let row; columns: orderColumns;"></tr>
+                <tr mat-footer-row *matFooterRowDef="orderColumns"></tr>
               </table>
             </div>
           </mat-tab>
@@ -388,7 +413,7 @@ export class CustomerDetailComponent {
 
   columns = ['name', 'barcode', 'quantity', 'dimensions', 'location', 'dateAdded', 'volume', 'prepUnit', 'fulfillmentUnit', 'monthlyCost', 'actions'];
   archivedColumns = ['name', 'barcode', 'dimensions', 'reason', 'notes', 'actions'];
-  orderColumns = ['date','item','qty','material','materialTotal','status','tracking','email','actions'];
+  orderColumns = ['date','item','qty','material','materialTotal','prepUnit','fulfillmentUnit','orderTotal','status','tracking','email','actions'];
 
   readonly form = this.fb.nonNullable.group({
     name: ['', Validators.required],
@@ -496,6 +521,30 @@ export class CustomerDetailComponent {
 
   // Orders
   orders = computed(() => this.store.ordersFor(this.email() ?? ''));
+
+  // Order helpers and totals (computed from items' per-unit settings or customer defaults)
+  totalOrderQuantity = () => this.orders().reduce((s, o) => s + (Number(o.quantity) || 0), 0);
+  orderMaterialTotal = (o: Order) => (Number(o.quantity) || 0) * (Number(o.materialCostPerFulfillment) || 0);
+  orderPrepUnit = (o: Order) => this.lookupItemPrepUnit(o);
+  orderFulfillmentUnit = (o: Order) => this.lookupItemFulfillmentUnit(o);
+  private lookupItemPrepUnit(o: Order): number {
+    const it = this.items().find(i => i.id === o.itemId);
+    if (!it) return this.prepDefault();
+    return it.prepPricingMode === 'manual' ? (Number(it.manualPrepCost) || 0) : this.prepDefault();
+  }
+  private lookupItemFulfillmentUnit(o: Order): number {
+    const it = this.items().find(i => i.id === o.itemId);
+    if (!it) return this.fulfillmentDefault();
+    return it.fulfillmentPricingMode === 'manual' ? (Number(it.manualFulfillmentCost) || 0) : this.fulfillmentDefault();
+  }
+  orderGrandTotal = (o: Order) => {
+    const q = Number(o.quantity) || 0;
+    return q * ((Number(o.materialCostPerFulfillment) || 0) + this.orderPrepUnit(o) + this.orderFulfillmentUnit(o));
+  };
+  totalOrderMaterial = () => this.orders().reduce((s, o) => s + this.orderMaterialTotal(o), 0);
+  totalOrderPrep = () => this.orders().reduce((s, o) => s + ((Number(o.quantity)||0) * this.orderPrepUnit(o)), 0);
+  totalOrderFulfillment = () => this.orders().reduce((s, o) => s + ((Number(o.quantity)||0) * this.orderFulfillmentUnit(o)), 0);
+  totalOrdersGrand = () => this.orders().reduce((s, o) => s + this.orderGrandTotal(o), 0);
 
   createOrder(item: Item) {
     const ref = this.dialog.open(CreateOrderDialogComponent, {
