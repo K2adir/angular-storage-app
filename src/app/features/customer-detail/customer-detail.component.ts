@@ -194,7 +194,7 @@ import { Order } from '../../models/order';
           <ng-container matColumnDef="quantity">
             <th mat-header-cell *matHeaderCellDef>Qty</th>
             <td mat-cell *matCellDef="let i">{{ i.quantity }}</td>
-            <td mat-footer-cell *matFooterCellDef></td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalQuantity() }}</td>
           </ng-container>
           <ng-container matColumnDef="dimensions">
             <th mat-header-cell *matHeaderCellDef>Dimensions (cm)</th>
@@ -214,22 +214,22 @@ import { Order } from '../../models/order';
           <ng-container matColumnDef="volume">
             <th mat-header-cell *matHeaderCellDef>Volume (m³)</th>
             <td mat-cell *matCellDef="let i">{{ volumeM3(i) | number:'1.3-3' }}</td>
-            <td mat-footer-cell *matFooterCellDef></td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalVolumeAllM3() | number:'1.3-3' }}</td>
           </ng-container>
           <ng-container matColumnDef="prepUnit">
             <th mat-header-cell *matHeaderCellDef>Prep/unit</th>
             <td mat-cell *matCellDef="let i">{{ prepUnitCost(i) | currency:'USD' }}</td>
-            <td mat-footer-cell *matFooterCellDef></td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalPrepCost() | currency:'USD' }}</td>
           </ng-container>
           <ng-container matColumnDef="fulfillmentUnit">
             <th mat-header-cell *matHeaderCellDef>Fulfillment/unit</th>
             <td mat-cell *matCellDef="let i">{{ fulfillUnitCost(i) | currency:'USD' }}</td>
-            <td mat-footer-cell *matFooterCellDef></td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalFulfillmentCost() | currency:'USD' }}</td>
           </ng-container>
           <ng-container matColumnDef="monthlyCost">
             <th mat-header-cell *matHeaderCellDef>Monthly Cost</th>
             <td mat-cell *matCellDef="let i">{{ storageCost(i) | currency:'USD' }}</td>
-            <td mat-footer-cell *matFooterCellDef>{{ totalMonthlyCost() | currency:'USD' }}</td>
+            <td mat-footer-cell *matFooterCellDef>{{ totalStorageCost() | currency:'USD' }}</td>
           </ng-container>
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef>Actions</th>
@@ -244,7 +244,9 @@ import { Order } from '../../models/order';
                     <mat-icon>shopping_cart_checkout</mat-icon>
                   </button>
             </td>
-            <td mat-footer-cell *matFooterCellDef></td>
+            <td mat-footer-cell *matFooterCellDef class="footer-summary">
+              {{ totalMonthlyCost() | currency:'USD' }}
+            </td>
           </ng-container>
 
               <tr mat-header-row *matHeaderRowDef="columns"></tr>
@@ -362,6 +364,7 @@ import { Order } from '../../models/order';
      .totals { display:flex; gap: 16px; align-items:center; }
      .spacer-divider { margin-inline: 8px; height: 32px; align-self: center; }
      .price-row { display:flex; align-items:center; gap: 12px; }
+     .footer-summary { font-weight: 600; white-space: nowrap; }
       @media (min-width: 900px) {
         .grid { grid-template-columns: 1fr; }
         .row { grid-template-columns: repeat(6, 1fr); }
@@ -437,6 +440,7 @@ export class CustomerDetailComponent {
   // Auto-priced items aggregation (per-item minimum 1 m³, ceil per item)
   itemsAuto = computed(() => this.items().filter(i => i.pricingMode !== 'manual'));
   autoVolumeM3 = computed(() => this.itemsAuto().reduce((sum, it) => sum + this.volumeM3(it), 0));
+  totalVolumeAllM3 = computed(() => this.items().reduce((sum, it) => sum + this.volumeM3(it), 0));
   itemBilledUnits(i: Item): number {
     const units = Math.ceil(this.volumeM3(i));
     return Math.max(1, units);
@@ -454,6 +458,7 @@ export class CustomerDetailComponent {
   totalFulfillmentCost = computed(() => this.items().reduce((sum, it) => sum + this.fulfillmentCost(it), 0));
   // Grand total if needed elsewhere
   totalMonthlyCost = computed(() => this.totalStorageCost() + this.totalPrepCost() + this.totalFulfillmentCost());
+  totalQuantity = computed(() => this.items().reduce((sum, it) => sum + (Number(it.quantity) || 0), 0));
 
   estimatedNewItemCost() {
     const raw = this.form.getRawValue();
