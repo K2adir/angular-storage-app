@@ -152,11 +152,34 @@ export class StorageService {
     this.persist();
   }
 
-  updateCustomer(email: string, patch: Partial<Customer>): void {
-    const key = email.trim().toLowerCase();
-    const updated = this.customers().map((c) => (c.email.toLowerCase() === key ? { ...c, ...patch } : c));
+  updateCustomer(email: string, patch: Partial<Customer> & { email?: string }): { ok: boolean; newEmail?: string; error?: string } {
+    const oldKey = email.trim().toLowerCase();
+    const customers = this.customers();
+    const existing = customers.find(c => c.email.toLowerCase() === oldKey);
+    if (!existing) return { ok: false, error: 'Customer not found' };
+
+    let currentKey = oldKey;
+    if (patch.email && patch.email.trim().toLowerCase() !== oldKey) {
+      const newKey = patch.email.trim().toLowerCase();
+      const conflict = customers.some(c => c.email.toLowerCase() === newKey);
+      if (conflict) return { ok: false, error: 'Another customer already uses this email' };
+      // Move keyed records
+      const items = this.itemsByEmail()[oldKey] ?? [];
+      const archived = this.archivedByEmail()[oldKey] ?? [];
+      const orders = this.ordersByEmail()[oldKey] ?? [];
+      this.itemsByEmail.set({ ...this.itemsByEmail(), [newKey]: items });
+      this.archivedByEmail.set({ ...this.archivedByEmail(), [newKey]: archived });
+      this.ordersByEmail.set({ ...this.ordersByEmail(), [newKey]: orders });
+      const itemsMap = { ...this.itemsByEmail() }; delete itemsMap[oldKey]; this.itemsByEmail.set(itemsMap);
+      const archMap = { ...this.archivedByEmail() }; delete archMap[oldKey]; this.archivedByEmail.set(archMap);
+      const ordersMap = { ...this.ordersByEmail() }; delete ordersMap[oldKey]; this.ordersByEmail.set(ordersMap);
+      currentKey = newKey;
+    }
+
+    const updated = customers.map(c => c.email.toLowerCase() === currentKey ? { ...c, ...patch, email: currentKey } : c);
     this.customers.set(updated);
     this.persist();
+    return { ok: true, newEmail: currentKey !== oldKey ? currentKey : undefined };
   }
 
   ordersFor(email: string): Order[] {

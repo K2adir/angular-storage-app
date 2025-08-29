@@ -34,7 +34,7 @@ export interface EditCustomerData {
           </mat-form-field>
           <mat-form-field appearance="outline" class="full">
             <mat-label>Email (ID)</mat-label>
-            <input matInput [value]="data.customer.email" disabled />
+            <input matInput formControlName="email" type="email" required />
           </mat-form-field>
           <mat-form-field appearance="outline" class="full">
             <mat-label>Phone</mat-label>
@@ -102,6 +102,7 @@ export class EditCustomerDialogComponent {
     name: [this.data.customer.name || ''],
     firstName: [this.data.customer.firstName || ''],
     lastName: [this.data.customer.lastName || ''],
+    email: [this.data.customer.email || '', [Validators.required, Validators.email]],
     phone: [this.data.customer.phone || ''],
     company: [this.data.customer.company || ''],
     addressLine1: [this.data.customer.addressLine1 || ''],
@@ -122,6 +123,7 @@ export class EditCustomerDialogComponent {
       name: v.name?.trim() || `${v.firstName || ''} ${v.lastName || ''}`.trim() || this.data.customer.name,
       firstName: v.firstName?.trim() || undefined,
       lastName: v.lastName?.trim() || undefined,
+      email: v.email?.trim() || undefined,
       phone: v.phone?.trim() || undefined,
       company: v.company?.trim() || undefined,
       addressLine1: v.addressLine1?.trim() || undefined,
@@ -136,4 +138,3 @@ export class EditCustomerDialogComponent {
     this.ref.close(patch);
   }
 }
-

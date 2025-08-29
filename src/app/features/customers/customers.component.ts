@@ -187,7 +187,10 @@ export class CustomersComponent {
     });
     ref.afterClosed().subscribe((patch) => {
       if (patch) {
-        this.store.updateCustomer(c.email, patch);
+        const res = this.store.updateCustomer(c.email, patch);
+        if (!res.ok) {
+          this.error = res.error || 'Failed to update customer';
+        }
       }
     });
   }
