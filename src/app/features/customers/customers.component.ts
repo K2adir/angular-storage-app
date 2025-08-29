@@ -1,6 +1,8 @@
 import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormControl } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { startWith } from 'rxjs';
 import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -92,11 +94,12 @@ export class CustomersComponent {
   error: string | null = null;
 
   readonly search = new FormControl('', { nonNullable: true });
+  private readonly searchTerm = toSignal(this.search.valueChanges.pipe(startWith(this.search.value)));
 
   columns = ['name', 'email', 'phone', 'company', 'city', 'country', 'actions'];
 
   filtered = computed(() => {
-    const q = (this.search.value || '').toLowerCase().trim();
+    const q = (this.searchTerm() || '').toLowerCase().trim();
     if (!q) return this.customers();
     return this.customers().filter(c =>
       [c.name, c.email, c.phone, c.company, c.city, c.country]
