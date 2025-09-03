@@ -3,6 +3,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { Customer } from '../models/customer';
 import { Item } from '../models/item';
 import { ArchivedItemRecord } from '../models/archived';
+import { ApiService } from './api.service';
 import { Order, OrderStatus } from '../models/order';
 
 interface StorageData {
@@ -21,6 +22,7 @@ export class StorageService {
   readonly archivedByEmail = signal<Record<string, ArchivedItemRecord[]>>({});
   readonly ordersByEmail = signal<Record<string, Order[]>>({});
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly api = inject(ApiService);
 
   constructor() {
     this.load();
@@ -48,6 +50,13 @@ export class StorageService {
     } catch {
       // ignore
     }
+    // Also try to load customers from API (if backend is running)
+    this.api.getCustomers().subscribe({
+      next: (list) => {
+        this.customers.set(list as Customer[]);
+      },
+      error: () => {}
+    });
   }
 
   private persist() {
@@ -66,12 +75,20 @@ export class StorageService {
     if (!email) return { ok: false, error: 'Email is required' };
     const exists = this.customers().some((c) => c.email.toLowerCase() === email);
     if (exists) return { ok: false, error: 'Customer with this email already exists' };
-    const list = [...this.customers(), { ...customer, email }];
-    this.customers.set(list);
+    // Try API first
+    this.api.addCustomer({ ...customer, email }).subscribe({
+      next: (c) => {
+        this.customers.set([...this.customers(), c]);
+      },
+      error: () => {
+        const list = [...this.customers(), { ...customer, email }];
+        this.customers.set(list);
+        this.persist();
+      }
+    });
     if (!this.itemsByEmail()[email]) this.itemsByEmail.set({ ...this.itemsByEmail(), [email]: [] });
     if (!this.archivedByEmail()[email]) this.archivedByEmail.set({ ...this.archivedByEmail(), [email]: [] });
     if (!this.ordersByEmail()[email]) this.ordersByEmail.set({ ...this.ordersByEmail(), [email]: [] });
-    this.persist();
     return { ok: true };
   }
 
